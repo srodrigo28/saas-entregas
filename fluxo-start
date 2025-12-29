@@ -1,0 +1,359 @@
+# API de Entregas como Serviço (Delivery as a Service)
+
+Este documento descreve um **passo a passo conceitual**, sem código, para ajudar você a **refletir e planejar** uma API de entregas voltada ao cenário brasileiro. Inclui **entidades (tabelas)**, **fluxos**, **perfis**, **status**, e **integrações externas**.
+
+---
+
+## 1) Visão Geral do Produto
+
+**Objetivo**: oferecer um serviço de logística urbana via API para:
+
+* Seu próprio app (estilo iFood)
+* Estabelecimentos (farmácias, restaurantes, mercados)
+* Terceiros (e-commerces regionais)
+
+**Modelo**: B2B / SaaS (por entrega, por plano mensal, ou híbrido).
+
+---
+
+## 2) Perfis e Papéis (Quem usa o sistema)
+
+### Perfis principais
+
+* **Admin da Plataforma**: configura regras, preços, integrações.
+* **Estabelecimento (Cliente B2B)**: cria pedidos, acompanha entregas.
+* **Entregador (Motorista/Motoboy)**: aceita e executa entregas.
+* **Sistema Integrado (API Client)**: apps e ERPs terceiros.
+
+---
+
+## 3) Entidades Principais (Resumo de Tabelas)
+
+### 3.1 Estabelecimentos
+
+| Campo                | Descrição                      |
+| -------------------- | ------------------------------ |
+| id                   | Identificador único            |
+| nome_fantasia        | Nome público                   |
+| razao_social         | Razão social                   |
+| cnpj                 | Documento                      |
+| endereco_base        | Ponto de coleta                |
+| latitude / longitude | Geolocalização                 |
+| tipo                 | Restaurante, Farmácia, Mercado |
+| plano                | Free, Pro, Enterprise          |
+| status               | Ativo, Suspenso                |
+
+---
+
+### 3.2 Usuários do Estabelecimento
+
+| Campo              | Descrição       |
+| ------------------ | --------------- |
+| id                 | Identificador   |
+| estabelecimento_id | Vínculo         |
+| nome               | Nome            |
+| email              | Login           |
+| perfil             | Admin, Operador |
+| status             | Ativo/Inativo   |
+
+---
+
+### 3.3 Entregadores
+
+| Campo      | Descrição         |
+| ---------- | ----------------- |
+| id         | Identificador     |
+| nome       | Nome              |
+| cpf        | Documento         |
+| telefone   | Contato           |
+| tipo       | Próprio, Parceiro |
+| status     | Ativo, Bloqueado  |
+| disponivel | Sim/Não           |
+| nota_media | Avaliação         |
+
+---
+
+### 3.4 Veículos
+
+| Campo         | Descrição         |
+| ------------- | ----------------- |
+| id            | Identificador     |
+| entregador_id | Dono              |
+| tipo          | Moto, Bike, Carro |
+| placa         | Identificação     |
+| capacidade    | Peso/volume       |
+| status        | Ativo             |
+
+---
+
+### 3.5 Endereços
+
+| Campo                | Descrição       |
+| -------------------- | --------------- |
+| id                   | Identificador   |
+| tipo                 | Coleta, Entrega |
+| logradouro           | Rua             |
+| numero               | Número          |
+| complemento          | Opcional        |
+| bairro               | Bairro          |
+| cidade               | Cidade          |
+| estado               | UF              |
+| latitude / longitude | Geolocalização  |
+
+---
+
+## 4) Entidade Central: Entrega
+
+### 4.1 Entregas
+
+| Campo               | Descrição        |
+| ------------------- | ---------------- |
+| id                  | Identificador    |
+| estabelecimento_id  | Origem           |
+| entregador_id       | Alocado          |
+| endereco_coleta_id  | Coleta           |
+| endereco_entrega_id | Destino          |
+| distancia_km        | Calculada        |
+| valor               | Preço da entrega |
+| status              | Fluxo da entrega |
+| tipo_servico        | Próprio, Externo |
+| previsao_entrega    | ETA              |
+
+---
+
+### 4.2 Status de Entrega (Fluxo)
+
+| Status              | Descrição          |
+| ------------------- | ------------------ |
+| CRIADA              | Pedido criado      |
+| PRECIFICADA         | Valor calculado    |
+| BUSCANDO_ENTREGADOR | Match em andamento |
+| ACEITA              | Entregador aceitou |
+| COLETADA            | Pedido coletado    |
+| EM_ROTA             | Em deslocamento    |
+| ENTREGUE            | Finalizada         |
+| CANCELADA           | Cancelada          |
+
+---
+
+### 4.3 Histórico de Status
+
+| Campo      | Descrição                            |
+| ---------- | ------------------------------------ |
+| id         | Identificador                        |
+| entrega_id | Vínculo                              |
+| status     | Status                               |
+| data_hora  | Timestamp                            |
+| origem     | Sistema, Entregador, Estabelecimento |
+
+---
+
+## 5) Precificação
+
+### 5.1 Regras de Preço
+
+| Campo             | Descrição     |
+| ----------------- | ------------- |
+| id                | Identificador |
+| taxa_base         | Valor fixo    |
+| valor_km          | Preço por km  |
+| adicional_noturno | Extra         |
+| adicional_chuva   | Extra         |
+| tipo_veiculo      | Moto, Bike    |
+| cidade            | Escopo        |
+
+---
+
+### 5.2 Simulação de Preço
+
+* Distância (km)
+* Tipo de veículo
+* Horário
+* Regras ativas
+
+Resultado: **valor_estimado**
+
+---
+
+## 6) Matching (Pedido ↔ Entregador)
+
+### Critérios iniciais (simples)
+
+* Disponibilidade
+* Proximidade
+* Tipo de veículo
+
+### Evolução futura
+
+* Avaliação
+* Tempo ocioso
+* Histórico de cancelamentos
+
+---
+
+## 7) Integrações Externas (APIs de Entrega)
+
+### 7.1 Tabela de Integrações
+
+| Campo      | Descrição          |
+| ---------- | ------------------ |
+| id         | Identificador      |
+| nome       | Uber Direct, Loggi |
+| tipo       | Delivery           |
+| ativo      | Sim/Não            |
+| prioridade | Ordem de uso       |
+
+---
+
+### 7.2 Entregas Externas
+
+| Campo          | Descrição     |
+| -------------- | ------------- |
+| id             | Identificador |
+| entrega_id     | Interna       |
+| integracao_id  | API usada     |
+| external_id    | ID externo    |
+| status_externo | Status API    |
+| custo          | Custo real    |
+
+---
+
+### Estratégia de uso
+
+1. Tentar entregador próprio
+2. Se falhar → API externa
+3. Registrar tudo no histórico
+
+---
+
+## 8) Rastreamento
+
+### 8.1 Localização do Entregador
+
+| Campo         | Descrição |
+| ------------- | --------- |
+| entregador_id | Quem      |
+| latitude      | Atual     |
+| longitude     | Atual     |
+| data_hora     | Timestamp |
+
+---
+
+## 9) Financeiro (opcional no MVP)
+
+### 9.1 Pagamentos de Entregadores
+
+| Campo         | Descrição      |
+| ------------- | -------------- |
+| entregador_id | Quem           |
+| entrega_id    | Referência     |
+| valor         | Comissão       |
+| status        | Pendente, Pago |
+| metodo        | Pix            |
+
+---
+
+## 10) Auditoria e Logs
+
+| Campo       | Descrição      |
+| ----------- | -------------- |
+| entidade    | Tipo           |
+| entidade_id | ID             |
+| acao        | CREATE, UPDATE |
+| origem      | API, Sistema   |
+| data_hora   | Timestamp      |
+
+---
+
+## 11) Fluxo Resumido (End-to-End)
+
+1. Estabelecimento cria entrega
+2. Sistema calcula distância
+3. Sistema precifica
+4. Busca entregador próprio
+5. Se não houver → integração externa
+6. Entregador aceita
+7. Coleta → rota → entrega
+8. Finaliza e registra histórico
+
+---
+
+## 12) Evolução Natural do Produto
+
+* MVP local (1 cidade)
+* Híbrido (próprio + APIs)
+* API pública para terceiros
+* App do entregador
+* Precificação dinâmica
+
+---
+
+## 13) Regra de Ouro
+
+> **Construa primeiro o fluxo simples e observável.**
+> Otimização vem depois.
+
+Este modelo serve para você **pensar, ajustar e discutir** antes de codar.
+
+## 14 Próximo.
+
+✅ Passo a passo do produto
+
+✅ Modelo de entidades/tabelas
+
+✅ Perfis (estabelecimentos, entregadores, admin)
+
+✅ Fluxo de entrega ponta a ponta
+
+✅ Precificação
+
+✅ Integrações externas (Uber Direct, Loggi, etc.)
+
+✅ Evolução natural do MVP até SaaS
+
+📌 Importante:
+Esse material não é para codar agora, é para:
+
+refletir,
+
+ajustar,
+
+validar ideia,
+
+enxergar complexidade real,
+
+evitar retrabalho depois.
+
+Como você pode usar esse material agora
+
+Sugestão prática:
+
+Leia como se fosse um produto real
+
+Pergunte:
+
+“Isso resolve dor real?”
+
+“O que posso cortar no MVP?”
+
+Marque:
+
+Essencial
+
+Pode esperar
+
+Nunca vou fazer
+
+Próximos passos (se quiser)
+
+Posso ajudar você a:
+
+🔹 Reduzir isso para um MVP enxuto (10 tabelas ou menos)
+
+🔹 Desenhar API pública (endpoints, contratos)
+
+🔹 Pensar modelo de cobrança
+
+🔹 Separar o que é core vs integração
+
+🔹 Simular caso real: farmácia de bairro
